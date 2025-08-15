@@ -1,0 +1,165 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  googleId      String    @unique
+  accessToken   String?   @db.Text
+  refreshToken  String?   @db.Text
+  tokenExpiry   DateTime?
+  
+  preferences   UserPreferences?
+  auditLogs     AuditLog[]
+  syllabi       Syllabus[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model UserPreferences {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  timeZone              String   @default("America/Los_Angeles")
+  workingHoursStart     String   @default("09:00") // HH:MM format
+  workingHoursEnd       String   @default("17:00") // HH:MM format
+  preferredDays         String[] // ["MONDAY", "TUESDAY", ...]
+  avoidDays             String[] // ["FRIDAY", "SATURDAY", ...]
+  defaultEventDuration  Int      @default(120) // minutes
+  breakDuration         Int      @default(15)  // minutes
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("user_preferences")
+}
+
+model AuditLog {
+  id                    String              @id @default(uuid())
+  userId                String
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  action                AuditAction
+  resourceType          String              // "EVENT", "CALENDAR", "PREFERENCE"
+  resourceId            String?             // Google Calendar Event ID
+  originalRequest       String              @db.Text
+  extractedData         Json?               // Parsed/extracted information
+  proposedChanges       Json?               // What was proposed
+  finalResult           Json?               // What actually happened
+  
+  status                AuditStatus
+  errorMessage          String?             @db.Text
+  
+  metadata              Json?               // Additional context
+  ipAddress             String?
+  userAgent             String?             @db.Text
+  
+  createdAt             DateTime            @default(now())
+
+  @@map("audit_logs")
+}
+
+model Syllabus {
+  id                    String              @id @default(uuid())
+  userId                String
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  filename              String
+  originalContent       String              @db.Text
+  processedContent      String?             @db.Text
+  extractedDates        Json[]              // Array of extracted date objects
+  
+  chunks                SyllabusChunk[]
+  
+  uploadedAt            DateTime            @default(now())
+  processedAt           DateTime?
+
+  @@map("syllabi")
+}
+
+model SyllabusChunk {
+  id                    String              @id @default(uuid())
+  syllabusId            String
+  syllabus              Syllabus            @relation(fields: [syllabusId], references: [id], onDelete: Cascade)
+  
+  content               String              @db.Text
+  chunkIndex            Int
+  pageNumber            Int?
+  
+  // Vector embedding for semantic search
+  embedding             Unsupported("vector(1536)")?
+  
+  metadata              Json?               // Additional chunk metadata
+  
+  createdAt             DateTime            @default(now())
+
+  @@map("syllabus_chunks")
+}
+
+model SchedulingSession {
+  id                    String              @id @default(uuid())
+  userId                String
+  
+  naturalLanguageInput  String              @db.Text
+  llmAnalysis           Json?               // LLM analysis results
+  extractedConstraints  Json?               // Parsed constraints
+  proposedPlans         Json[]              // Array of event plans
+  selectedPlan          Json?               // User's chosen plan
+  
+  conflictAnalysis      Json?               // Conflict detection results
+  alternatives          Json[]              // Alternative options
+  
+  status                SessionStatus
+  finalCalendarEventId  String?             // Google Calendar Event ID if created
+  
+  startedAt             DateTime            @default(now())
+  completedAt           DateTime?
+  
+  @@map("scheduling_sessions")
+}
+
+enum AuditAction {
+  CREATE_EVENT
+  UPDATE_EVENT
+  DELETE_EVENT
+  CHECK_CONFLICTS
+  ANALYZE_REQUEST
+  UPLOAD_SYLLABUS
+  UPDATE_PREFERENCES
+}
+
+enum AuditStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum SessionStatus {
+  STARTED
+  ANALYZING
+  PLANNING
+  CONFLICT_CHECK
+  USER_REVIEW
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+// Index for vector similarity search (will be created via migration)
+// CREATE INDEX ON syllabus_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);

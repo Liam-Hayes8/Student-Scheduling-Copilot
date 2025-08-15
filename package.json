@@ -1,0 +1,57 @@
+{
+  "name": "student-scheduling-copilot",
+  "version": "1.0.0",
+  "description": "A sophisticated web application for natural language scheduling with Google Calendar integration",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "api"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:api": "cd api && npm run dev",
+    "build": "npm run build:frontend && npm run build:api",
+    "build:frontend": "cd frontend && npm run build",
+    "build:api": "cd api && npm run build",
+    "test": "npm run test:frontend && npm run test:api",
+    "test:frontend": "cd frontend && npm run test",
+    "test:api": "cd api && npm run test",
+    "lint": "npm run lint:frontend && npm run lint:api",
+    "lint:frontend": "cd frontend && npm run lint",
+    "lint:api": "cd api && npm run lint",
+    "typecheck": "npm run typecheck:frontend && npm run typecheck:api",
+    "typecheck:frontend": "cd frontend && npm run typecheck",
+    "typecheck:api": "cd api && npm run typecheck",
+    "clean": "rm -rf frontend/.next frontend/out frontend/node_modules api/dist api/node_modules node_modules",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/student-scheduling-copilot.git"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "keywords": [
+    "scheduling",
+    "calendar",
+    "natural-language",
+    "google-calendar",
+    "ai",
+    "student",
+    "typescript",
+    "nextjs",
+    "express"
+  ]
+}
