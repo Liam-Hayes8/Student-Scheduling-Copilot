@@ -118,9 +118,30 @@ export default function SchedulingInterface() {
     return 'text-red-600 bg-red-100'
   }
 
-  const handleAddToCalendar = (plan: EventPlan) => {
-    // In demo mode, just show a success message
-    alert(`Demo: "${plan.title}" would be added to your calendar for ${formatDate(plan.startDateTime)} at ${formatTime(plan.startDateTime)}`)
+  const handleAddToCalendar = async (plan: EventPlan) => {
+    try {
+      const resp = await fetch('/api/calendar/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: plan.title,
+          description: plan.description,
+          startDateTime: plan.startDateTime,
+          endDateTime: plan.endDateTime,
+          location: plan.location,
+          attendees: plan.attendees
+        })
+      })
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}))
+        alert(`Failed to create event${err.error ? `: ${err.error}` : ''}`)
+        return
+      }
+      const data = await resp.json()
+      alert(`Event created (demo): ${data.data.id}`)
+    } catch (e) {
+      alert('Failed to create event')
+    }
   }
 
   return (
