@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { DocumentArrowUpIcon, MagnifyingGlassIcon, CalendarIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { DocumentArrowUpIcon, MagnifyingGlassIcon, CalendarIcon } from '@heroicons/react/24/outline'
 
 interface SyllabusEvent {
   id: string
@@ -31,6 +31,8 @@ export default function SyllabusUpload() {
   const [searchResults, setSearchResults] = useState<SyllabusEvent[]>([])
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set())
   const [isImporting, setIsImporting] = useState(false)
+  const [errorBanner, setErrorBanner] = useState<string | null>(null)
+  const [successBanner, setSuccessBanner] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,14 +40,16 @@ export default function SyllabusUpload() {
     if (!file) return
 
     if (file.type !== 'application/pdf') {
-      alert('Please upload a PDF file')
+      setErrorBanner('Please upload a PDF file')
       return
     }
 
     setIsUploading(true)
+    setErrorBanner(null)
+    setSuccessBanner(null)
     const formData = new FormData()
     formData.append('syllabus', file)
-    formData.append('userId', 'temp-user-id') // In production, get from auth
+    formData.append('userId', 'demo-user')
 
     try {
       const response = await fetch('/api/syllabus/upload', {
@@ -59,9 +63,9 @@ export default function SyllabusUpload() {
 
       const data = await response.json()
       setAnalysis(data.data)
+      setSuccessBanner(data.data?.summary || 'Syllabus processed')
     } catch (error) {
-      console.error('Upload error:', error)
-      alert('Failed to upload syllabus. Please try again.')
+      setErrorBanner('Failed to upload syllabus. Please try again.')
     } finally {
       setIsUploading(false)
     }
@@ -69,16 +73,18 @@ export default function SyllabusUpload() {
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
+    setErrorBanner(null)
+    setSuccessBanner(null)
 
     try {
-      const response = await fetch(`/api/syllabus/search?userId=temp-user-id&query=${encodeURIComponent(searchQuery)}`)
+      const response = await fetch(`/api/syllabus/search?userId=demo-user&query=${encodeURIComponent(searchQuery)}`)
       if (!response.ok) throw new Error('Search failed')
 
       const data = await response.json()
       setSearchResults(data.data.events)
+      setSuccessBanner(`Found ${data.data.count} matching event(s)`) 
     } catch (error) {
-      console.error('Search error:', error)
-      alert('Search failed. Please try again.')
+      setErrorBanner('Search failed. Please try again.')
     }
   }
 
@@ -86,12 +92,14 @@ export default function SyllabusUpload() {
     if (selectedEvents.size === 0) return
 
     setIsImporting(true)
+    setErrorBanner(null)
+    setSuccessBanner(null)
     try {
       const response = await fetch('/api/syllabus/import-events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: 'temp-user-id',
+          userId: 'demo-user',
           eventIds: Array.from(selectedEvents)
         })
       })
@@ -99,11 +107,10 @@ export default function SyllabusUpload() {
       if (!response.ok) throw new Error('Import failed')
 
       const data = await response.json()
-      alert(`Successfully prepared ${data.data.imported} events for calendar import!`)
+      setSuccessBanner(`Prepared ${data.data.imported} event(s) for calendar import (demo)`) 
       setSelectedEvents(new Set())
     } catch (error) {
-      console.error('Import error:', error)
-      alert('Import failed. Please try again.')
+      setErrorBanner('Import failed. Please try again.')
     } finally {
       setIsImporting(false)
     }
@@ -141,6 +148,22 @@ export default function SyllabusUpload() {
 
   return (
     <div className="space-y-6">
+      {/* Banners */}
+      {errorBanner && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="text-red-800">
+            <strong>Error:</strong> {errorBanner}
+          </div>
+        </div>
+      )}
+      {successBanner && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="text-green-800">
+            <strong>Success:</strong> {successBanner}
+          </div>
+        </div>
+      )}
+
       {/* Upload Section */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex items-center space-x-2 mb-4">
