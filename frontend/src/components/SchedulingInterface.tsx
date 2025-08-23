@@ -29,6 +29,7 @@ export default function SchedulingInterface() {
   const [isLoading, setIsLoading] = useState(false)
   const [response, setResponse] = useState<SchedulingResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [successBanner, setSuccessBanner] = useState<string | null>(null)
   const [editingPlan, setEditingPlan] = useState<string | null>(null)
   const [editedPlans, setEditedPlans] = useState<EventPlan[]>([])
 
@@ -38,6 +39,7 @@ export default function SchedulingInterface() {
 
     setIsLoading(true)
     setError(null)
+    setSuccessBanner(null)
 
     try {
       const res = await fetch('/api/planner/analyze', {
@@ -69,12 +71,10 @@ export default function SchedulingInterface() {
 
   const saveEdit = (planId: string) => {
     setEditingPlan(null)
-    // The edited plans are already updated in state
   }
 
   const cancelEdit = () => {
     setEditingPlan(null)
-    // Reset to original plans
     if (response) {
       setEditedPlans(response.data.plans)
     }
@@ -134,13 +134,16 @@ export default function SchedulingInterface() {
       })
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}))
-        alert(`Failed to create event${err.error ? `: ${err.error}` : ''}`)
+        setSuccessBanner(null)
+        setError(`Failed to create event${err.error ? `: ${err.error}` : ''}`)
         return
       }
       const data = await resp.json()
-      alert(`Event created (demo): ${data.data.id}`)
+      setError(null)
+      setSuccessBanner(`Event created (demo): ${data.data.id}`)
     } catch (e) {
-      alert('Failed to create event')
+      setSuccessBanner(null)
+      setError('Failed to create event')
     }
   }
 
@@ -191,11 +194,18 @@ export default function SchedulingInterface() {
         </form>
       </div>
 
-      {/* Error Display */}
+      {/* Error / Success Banners */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="text-red-800">
             <strong>Error:</strong> {error}
+          </div>
+        </div>
+      )}
+      {successBanner && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="text-green-800">
+            <strong>Success:</strong> {successBanner}
           </div>
         </div>
       )}
@@ -222,8 +232,6 @@ export default function SchedulingInterface() {
             <div className="space-y-4">
               {editedPlans.map((plan, index) => {
                 const isEditing = editingPlan === plan.id
-                const originalPlan = response.data.plans.find(p => p.id === plan.id)
-                
                 return (
                   <div key={plan.id} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex items-start justify-between mb-3">

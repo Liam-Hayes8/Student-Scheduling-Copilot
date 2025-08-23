@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import SchedulingInterface from '@/components/SchedulingInterface'
 import SyllabusUpload from '@/components/SyllabusUpload'
+import HealthStatus from '@/components/HealthStatus'
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'scheduling' | 'syllabus'>('scheduling')
@@ -21,6 +22,7 @@ export default function Home() {
               <span className="text-sm text-gray-600">
                 Demo Mode
               </span>
+              <HealthStatus />
             </div>
           </div>
         </div>
