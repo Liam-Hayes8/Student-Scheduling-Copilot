@@ -40,11 +40,15 @@ Track implementation status and next steps for the Student Scheduling Copilot.
 - Vector embeddings setup for future RAG
 - Database service layer
 
-### 🔜 Future Enhancements
-- [ ] PDF upload and parsing for syllabi
-- [ ] Syllabus data chunking and embedding
-- [ ] "Import exam dates" functionality
-- [ ] Vector search for user rules
+### ✅ RAG Syllabus Parser - COMPLETED
+- [x] PDF upload and parsing for syllabi
+- [x] Syllabus data chunking and embedding
+- [x] "Import exam dates" functionality
+- [x] Vector search for user rules
+- [x] Course information extraction
+- [x] Event type classification (exam, assignment, quiz, project)
+- [x] Confidence scoring for extracted events
+- [x] Frontend interface for syllabus upload and management
 
 ## Phase 5: MVP Polish ✅ COMPLETED
 
@@ -74,8 +78,11 @@ Track implementation status and next steps for the Student Scheduling Copilot.
 - ✅ Complete audit trail of all operations
 - ✅ Responsive UI with real-time feedback
 - ✅ Database persistence of users, preferences, and sessions
+- ✅ **NEW: RAG Syllabus Parser** - PDF upload, exam date extraction, course info parsing
+- ✅ **NEW: Syllabus Event Management** - Search, filter, and import to calendar
+- ✅ **NEW: Advanced UI** - Tabbed interface with scheduling and syllabus management
 
-**Next Phase**: Production deployment and advanced features (RAG, syllabus parsing)
+**Next Phase**: Production deployment and advanced features (multi-calendar, preference learning)
 
 ## Architecture Implemented
 

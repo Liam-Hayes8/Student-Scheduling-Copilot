@@ -2,3 +2,11 @@ node_modules/
 frontend/node_modules/
 api/node_modules/
 **/*.node
+
+# Ignore env and build
+.env
+*/.env
+api/.env
+api/dist/
+frontend/.next/
+*.log

@@ -26,18 +26,19 @@ router.post('/analyze', async (req: Request, res: Response, next: NextFunction) 
     let llmAnalysis;
 
     try {
-      // Try LLM analysis first for enhanced understanding
-      llmAnalysis = await llmService.analyzeRequest(request);
+      // Use basic planner for now (LLM integration can be added later)
+      eventPlans = await plannerService.createEventPlan(request);
       
-      if (llmAnalysis.confidence > 0.6 && llmAnalysis.intent === 'SCHEDULE_EVENT') {
-        eventPlans = await llmService.generateEventPlan(llmAnalysis.extractedInfo, naturalLanguageInput);
-      } else {
-        // Fallback to basic planner if LLM confidence is low
-        eventPlans = await plannerService.createEventPlan(request);
+      // Try LLM analysis for additional insights (optional)
+      try {
+        llmAnalysis = await llmService.analyzeRequest(request);
+      } catch (llmError) {
+        console.warn('LLM service unavailable:', llmError);
+        llmAnalysis = null;
       }
-    } catch (llmError) {
-      console.warn('LLM service unavailable, using fallback planner:', llmError);
-      // Fallback to basic planner if LLM fails
+    } catch (error) {
+      console.error('Planning service error:', error);
+      // Fallback to basic planner
       eventPlans = await plannerService.createEventPlan(request);
       llmAnalysis = null;
     }

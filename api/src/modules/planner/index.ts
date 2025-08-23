@@ -2,11 +2,11 @@ import { EventPlan, SchedulingRequest, EventConstraints, TimeRange, RecurrenceRu
 import { v4 as uuidv4 } from 'uuid';
 
 interface ParsedSchedule {
-  title?: string;
-  duration?: number;
+  title: string | undefined;
+  duration: number | undefined;
   timeSlots: string[];
-  frequency?: string;
-  daysOfWeek?: string[];
+  frequency: string | undefined;
+  daysOfWeek: string[];
   constraints: EventConstraints;
 }
 
@@ -19,12 +19,12 @@ export class PlannerService {
     return timeSlots.map((slot, index) => ({
       id: uuidv4(),
       title: parsed.title || this.extractTitle(request.naturalLanguageInput) || 'Untitled Event',
-      description: this.extractDescription(request.naturalLanguageInput),
+      description: this.extractDescription(request.naturalLanguageInput) || undefined,
       startDateTime: slot.start,
       endDateTime: slot.end,
-      location: this.extractLocation(request.naturalLanguageInput),
-      attendees: this.extractAttendees(request.naturalLanguageInput),
-      recurrence: this.extractRecurrence(request.naturalLanguageInput),
+      location: this.extractLocation(request.naturalLanguageInput) || undefined,
+      attendees: this.extractAttendees(request.naturalLanguageInput) || undefined,
+      recurrence: this.extractRecurrence(request.naturalLanguageInput) || undefined,
       constraints: parsed.constraints,
       confidence: this.calculateConfidence(request.naturalLanguageInput, slot),
       explanation: this.generateExplanation(request.naturalLanguageInput, slot, parsed.constraints)
@@ -103,7 +103,7 @@ export class PlannerService {
   private extractDuration(input: string): number {
     const durationPattern = /(\d+)\s*(hour|hr|minute|min)s?/i;
     const match = input.match(durationPattern);
-    if (match) {
+    if (match && match[1] && match[2]) {
       const value = parseInt(match[1]);
       const unit = match[2].toLowerCase();
       return unit.startsWith('hour') || unit.startsWith('hr') ? value * 60 : value;
@@ -225,7 +225,7 @@ export class PlannerService {
     const timePattern = /(\d{1,2}):?(\d{2})?\s*(am|pm)?/i;
     const match = timeStr.match(timePattern);
     
-    if (!match) return null;
+    if (!match || !match[1]) return null;
 
     let hours = parseInt(match[1]);
     const minutes = parseInt(match[2] || '0');
@@ -305,7 +305,7 @@ export class PlannerService {
 
   private parseDuration(durationStr: string): number {
     const match = durationStr.match(/(\d+)\s*(hour|hr|minute|min)/i);
-    if (match) {
+    if (match && match[1] && match[2]) {
       const value = parseInt(match[1]);
       const unit = match[2].toLowerCase();
       return unit.startsWith('hour') || unit.startsWith('hr') ? value * 60 : value;

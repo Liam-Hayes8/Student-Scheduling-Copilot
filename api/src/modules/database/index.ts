@@ -226,6 +226,68 @@ export class DatabaseService {
   async disconnect() {
     await this.prisma.$disconnect();
   }
+
+  // RAG-specific methods
+  async storeCourseInfo(userId: string, courseInfo: any) {
+    return await this.prisma.courseInfo.upsert({
+      where: { userId },
+      update: courseInfo,
+      create: {
+        userId,
+        ...courseInfo
+      }
+    });
+  }
+
+  async storeSyllabusEvent(userId: string, event: any) {
+    return await this.prisma.syllabusEvent.create({
+      data: {
+        userId,
+        title: event.title,
+        date: new Date(event.date),
+        type: event.type,
+        description: event.description,
+        course: event.course,
+        confidence: event.confidence,
+        sourceText: event.sourceText
+      }
+    });
+  }
+
+  async storeDocumentChunks(userId: string, docs: any[]) {
+    const chunks = docs.map((doc, index) => ({
+      userId,
+      content: doc.pageContent,
+      chunkIndex: index,
+      pageNumber: doc.metadata?.pageNumber || 1,
+      metadata: doc.metadata
+    }));
+
+    return await this.prisma.documentChunk.createMany({
+      data: chunks
+    });
+  }
+
+  async getSyllabusEvents(userId: string) {
+    return await this.prisma.syllabusEvent.findMany({
+      where: { userId },
+      orderBy: { date: 'asc' }
+    });
+  }
+
+  async getCourseInfo(userId: string) {
+    return await this.prisma.courseInfo.findUnique({
+      where: { userId }
+    });
+  }
+
+  async deleteSyllabusData(userId: string) {
+    await Promise.all([
+      this.prisma.syllabusEvent.deleteMany({ where: { userId } }),
+      this.prisma.courseInfo.deleteMany({ where: { userId } }),
+      this.prisma.documentChunk.deleteMany({ where: { userId } })
+    ]);
+  }
 }
 
 export const dbService = new DatabaseService();

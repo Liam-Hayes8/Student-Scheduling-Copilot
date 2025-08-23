@@ -110,6 +110,55 @@ model SyllabusChunk {
   @@map("syllabus_chunks")
 }
 
+model CourseInfo {
+  id                    String              @id @default(uuid())
+  userId                String              @unique
+  
+  name                  String?             // Course name (e.g., "CS 101")
+  instructor            String?             // Instructor name
+  semester              String?             // Semester info (e.g., "Fall 2024")
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@map("course_info")
+}
+
+model SyllabusEvent {
+  id                    String              @id @default(uuid())
+  userId                String
+  
+  title                 String
+  date                  DateTime
+  type                  SyllabusEventType
+  description           String?             @db.Text
+  course                String?
+  confidence            Float               // 0.0 to 1.0
+  sourceText            String              @db.Text
+  
+  createdAt             DateTime            @default(now())
+
+  @@map("syllabus_events")
+}
+
+model DocumentChunk {
+  id                    String              @id @default(uuid())
+  userId                String
+  
+  content               String              @db.Text
+  chunkIndex            Int
+  pageNumber            Int?
+  
+  // Vector embedding for semantic search
+  embedding             Unsupported("vector(1536)")?
+  
+  metadata              Json?               // Additional chunk metadata
+  
+  createdAt             DateTime            @default(now())
+
+  @@map("document_chunks")
+}
+
 model SchedulingSession {
   id                    String              @id @default(uuid())
   userId                String
@@ -159,6 +208,14 @@ enum SessionStatus {
   COMPLETED
   CANCELLED
   FAILED
+}
+
+enum SyllabusEventType {
+  EXAM
+  ASSIGNMENT
+  QUIZ
+  PROJECT
+  OTHER
 }
 
 // Index for vector similarity search (will be created via migration)

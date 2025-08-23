@@ -10,11 +10,12 @@ import { requestLogger } from '@/middleware/logging';
 import authRoutes from '@/routes/auth';
 import plannerRoutes from '@/routes/planner';
 import calendarRoutes from '@/routes/calendar';
+import syllabusRoutes from '@/routes/syllabus';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3005;
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -24,7 +25,7 @@ const limiter = rateLimit({
 
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || 'http://localhost:3004',
   credentials: true
 }));
 app.use(limiter);
@@ -36,6 +37,7 @@ app.use(requestLogger);
 app.use('/api/auth', authRoutes);
 app.use('/api/planner', plannerRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/syllabus', syllabusRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ 

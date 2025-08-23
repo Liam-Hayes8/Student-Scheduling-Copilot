@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:frontend\"",
     "dev:frontend": "cd frontend && npm run dev",
-    "dev:api": "cd api && npm run dev",
+    "dev:api": "cd api && npm run dev:simple",
+    "dev:frontend-only": "cd frontend && npm run dev",
+    "dev:api-only": "cd api && npm run dev",
     "build": "npm run build:frontend && npm run build:api",
     "build:frontend": "cd frontend && npm run build",
     "build:api": "cd api && npm run build",

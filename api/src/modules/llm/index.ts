@@ -22,12 +22,22 @@ export class LLMOrchestratorService {
   private openai: OpenAI;
 
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    // Only initialize OpenAI if API key is available and valid
+    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'demo-key-placeholder') {
+      this.openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+    } else {
+      console.warn('OpenAI API key not configured. LLM features will be disabled.');
+    }
   }
 
   async analyzeRequest(request: SchedulingRequest): Promise<LLMResponse> {
+    // If OpenAI is not configured, return fallback response
+    if (!this.openai) {
+      return this.getFallbackResponse(request.naturalLanguageInput);
+    }
+    
     try {
       const completion = await this.openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4-1106-preview',
@@ -140,10 +150,10 @@ export class LLMOrchestratorService {
           frequency: extracted.frequency,
           constraints: {
             avoidDays: extracted.avoidDays,
-            avoidTimes: extracted.avoidTimes?.map((time: string) => ({
-              start: time,
-              end: time
-            }))
+                        // avoidTimes: extracted.avoidTimes?.map((time: string) => ({
+            //   start: time,
+            //   end: time
+            // }))
           },
           location: extracted.location,
           attendees: extracted.attendees
