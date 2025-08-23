@@ -120,9 +120,14 @@ export default function SchedulingInterface() {
 
   const handleAddToCalendar = async (plan: EventPlan) => {
     try {
+      const demo = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false'
+      let headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      // Lazy import useSession hook data by reading from window if available is overkill; keep simple: rely on backend demo unless demo disabled.
+      // In real mode, frontend route should attach bearer in its route handler. For now, demo path stays.
+
       const resp = await fetch('/api/calendar/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           title: plan.title,
           description: plan.description,
@@ -140,7 +145,7 @@ export default function SchedulingInterface() {
       }
       const data = await resp.json()
       setError(null)
-      setSuccessBanner(`Event created (demo): ${data.data.id}`)
+      setSuccessBanner(`Event created${data.data?.htmlLink ? `: ${data.data.htmlLink}` : ` (demo): ${data.data.id}`}`)
     } catch (e) {
       setSuccessBanner(null)
       setError('Failed to create event')

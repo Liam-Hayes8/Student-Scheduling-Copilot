@@ -4,9 +4,12 @@ import { useState } from 'react'
 import SchedulingInterface from '@/components/SchedulingInterface'
 import SyllabusUpload from '@/components/SyllabusUpload'
 import HealthStatus from '@/components/HealthStatus'
+import { useSession, signIn, signOut } from 'next-auth/react'
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'scheduling' | 'syllabus'>('scheduling')
+  const { data: session } = useSession()
+  const demo = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -20,8 +23,15 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">
-                Demo Mode
+                {demo ? 'Demo Mode' : session?.user?.email || 'Signed out'}
               </span>
+              {!demo && (
+                session ? (
+                  <button onClick={() => signOut()} className="px-3 py-1 text-sm bg-gray-200 rounded">Sign out</button>
+                ) : (
+                  <button onClick={() => signIn('google')} className="px-3 py-1 text-sm bg-blue-600 text-white rounded">Sign in</button>
+                )
+              )}
               <HealthStatus />
             </div>
           </div>
