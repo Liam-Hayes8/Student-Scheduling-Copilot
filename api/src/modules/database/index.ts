@@ -10,6 +10,21 @@ export class DatabaseService {
     });
   }
 
+  // Ensure a user row exists (useful in demo mode). Uses provided id as primary key.
+  async ensureDemoUser(userId: string) {
+    const email = `demo+${userId}@example.com`
+    return await this.prisma.user.upsert({
+      where: { id: userId },
+      update: {},
+      create: {
+        id: userId,
+        email,
+        name: 'Demo User',
+        googleId: userId
+      }
+    })
+  }
+
   async createUser(userData: {
     email: string;
     name?: string;
@@ -147,9 +162,29 @@ export class DatabaseService {
     embedding?: number[];
     metadata?: any;
   }[]) {
-    return await this.prisma.syllabusChunk.createMany({
-      data: chunks
-    });
+    // If any chunk has embeddings, use raw SQL to cast to vector safely
+    const anyEmbeddings = chunks.some(c => Array.isArray(c.embedding) && c.embedding.length)
+    if (!anyEmbeddings) {
+      return await this.prisma.syllabusChunk.createMany({ data: chunks.map(({ embedding, ...rest }) => rest as any) })
+    }
+
+    await this.prisma.$transaction(async (p) => {
+      for (const c of chunks) {
+        const embStr = Array.isArray(c.embedding) ? `[${c.embedding.join(',')}]` : null
+        const baseSql = 'INSERT INTO "public"."syllabus_chunks" ("id", "syllabusId", "content", "chunkIndex", "pageNumber", "embedding", "metadata", "createdAt") VALUES (gen_random_uuid(), $1, $2, $3, $4, '
+        const sql = baseSql + (embStr ? '$5::vector' : 'NULL') + ', $' + (embStr ? '6' : '5') + ', NOW())'
+        const params: any[] = [
+          c.syllabusId,
+          c.content,
+          c.chunkIndex,
+          c.pageNumber || null,
+        ]
+        if (embStr) params.push(embStr)
+        params.push(c.metadata ?? null)
+        await p.$executeRawUnsafe(sql, ...params)
+      }
+    })
+    return { count: chunks.length }
   }
 
   async searchSyllabusChunks(userId: string, embedding: number[], limit: number = 5) {
@@ -240,12 +275,21 @@ export class DatabaseService {
   }
 
   async storeSyllabusEvent(userId: string, event: any) {
+    // Normalize event type to Prisma enum
+    const mapType = (t: any): any => {
+      const s = String(t || '').toUpperCase()
+      if (s.includes('EXAM') || s.includes('FINAL') || s.includes('MIDTERM') || s.includes('TEST')) return 'EXAM'
+      if (s.includes('ASSIGN')) return 'ASSIGNMENT'
+      if (s.includes('QUIZ')) return 'QUIZ'
+      if (s.includes('PROJECT')) return 'PROJECT'
+      return 'OTHER'
+    }
     return await this.prisma.syllabusEvent.create({
       data: {
         userId,
         title: event.title,
         date: new Date(event.date),
-        type: event.type,
+        type: mapType(event.type),
         description: event.description,
         course: event.course,
         confidence: event.confidence,

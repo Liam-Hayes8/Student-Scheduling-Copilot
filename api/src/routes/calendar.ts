@@ -3,17 +3,19 @@ import { google } from 'googleapis'
 
 const router = Router()
 
-router.post('/create', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/create', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization || ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
     if (!token) {
-      return res.status(401).json({ success: false, error: 'Missing bearer access token' })
+      res.status(401).json({ success: false, error: 'Missing bearer access token' })
+      return
     }
 
     const { title, description, startDateTime, endDateTime, location, attendees } = req.body || {}
     if (!title || !startDateTime || !endDateTime) {
-      return res.status(400).json({ success: false, error: 'Missing required fields' })
+      res.status(400).json({ success: false, error: 'Missing required fields' })
+      return
     }
 
     const oauth2 = new google.auth.OAuth2()
@@ -34,9 +36,11 @@ router.post('/create', async (req: Request, res: Response, next: NextFunction) =
       requestBody: event,
     })
 
-    return res.json({ success: true, data: { id: response.data.id, htmlLink: response.data.htmlLink } })
+    res.json({ success: true, data: { id: response.data.id, htmlLink: response.data.htmlLink } })
+    return
   } catch (error) {
     next(error)
+    return
   }
 })
 

@@ -7,10 +7,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId') || 'demo-user'
     const query = searchParams.get('query') || ''
-    const resp = await fetch(`${apiUrl}/api/syllabus/search?userId=${encodeURIComponent(userId)}&query=${encodeURIComponent(query)}`)
-    const data = await resp.json()
+    const limit = searchParams.get('limit') || '5'
+    const resp = await fetch(`${apiUrl}/api/syllabus/snippets?userId=${encodeURIComponent(userId)}&query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`)
+    const data = await resp.json().catch(() => ({ success: false, error: 'Bad upstream response' }))
     return NextResponse.json(data, { status: resp.status })
   } catch (e) {
     return NextResponse.json({ error: 'Proxy error' }, { status: 500 })
   }
 }
+
+

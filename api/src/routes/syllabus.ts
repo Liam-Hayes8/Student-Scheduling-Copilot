@@ -13,7 +13,7 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
+    if ((file.mimetype && file.mimetype.includes('pdf')) || file.originalname.toLowerCase().endsWith('.pdf')) {
       cb(null, true);
     } else {
       cb(new Error('Only PDF files are allowed'));
@@ -30,7 +30,7 @@ router.post('/upload', upload.single('syllabus'), async (req: Request, res: Resp
 
     const userId = req.body.userId || 'temp-user-id'; // In production, get from auth
 
-    const analysis = await ragService.processSyllabus(req.file.buffer, userId);
+    const analysis = await ragService.processSyllabus(req.file.buffer, userId, req.file.originalname);
 
     res.json({
       success: true,
@@ -89,6 +89,25 @@ router.get('/upcoming', async (req: Request, res: Response, next: NextFunction) 
     next(error);
   }
 });
+
+// Semantic snippets (top matching chunks)
+router.get('/snippets', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { userId, query, limit } = req.query
+    if (!userId || !query) {
+      throw createError('Missing required parameters: userId, query', 400)
+    }
+    const lim = limit ? parseInt(limit as string, 10) : 5
+    const chunks = await (ragService as any).semanticSearchChunks(userId as string, query as string, lim)
+    res.json({ success: true, data: { snippets: chunks?.map((c: any) => ({
+      content: c.content,
+      pageNumber: c.pageNumber,
+      chunkIndex: c.chunkIndex
+    })) || [] } })
+  } catch (error) {
+    next(error)
+  }
+})
 
 // Import syllabus events to calendar
 router.post('/import-events', async (req: Request, res: Response, next: NextFunction) => {

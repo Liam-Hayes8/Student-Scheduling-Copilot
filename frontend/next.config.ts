@@ -1,8 +1,13 @@
 import type { NextConfig } from "next";
 
+// Toggle rewrites based on demo mode. In real mode, use Next API routes directly.
+const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
+
 const nextConfig: NextConfig = {
-  // In demo mode we proxy all /api/* to the demo server on 3006
   async rewrites() {
+    if (!isDemo) {
+      return [];
+    }
     return [
       {
         source: '/api/:path*',

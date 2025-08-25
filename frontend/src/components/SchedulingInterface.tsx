@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import AuditPanel from '@/components/AuditPanel'
 import { PaperAirplaneIcon, SparklesIcon, CalendarIcon, ClockIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
 interface EventPlan {
@@ -32,6 +33,9 @@ export default function SchedulingInterface() {
   const [successBanner, setSuccessBanner] = useState<string | null>(null)
   const [editingPlan, setEditingPlan] = useState<string | null>(null)
   const [editedPlans, setEditedPlans] = useState<EventPlan[]>([])
+  const [checkingConflictsFor, setCheckingConflictsFor] = useState<string | null>(null)
+  const [planConflicts, setPlanConflicts] = useState<Record<string, { busy: { start: string, end: string }[] }>>({})
+  const [planSuggestions, setPlanSuggestions] = useState<Record<string, { start: string, end: string }[]>>({})
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,6 +96,81 @@ export default function SchedulingInterface() {
     ))
   }
 
+  const intervalsOverlap = (aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) => {
+    return aStart < bEnd && bStart < aEnd
+  }
+
+  const computeSuggestions = (plan: EventPlan, busy: { start: string, end: string }[]) => {
+    const suggestions: { start: string, end: string }[] = []
+    const originalStart = new Date(plan.startDateTime)
+    const originalEnd = new Date(plan.endDateTime)
+    const durationMs = originalEnd.getTime() - originalStart.getTime()
+
+    // Create a search window: from start-of-day to +2 days
+    const windowStart = new Date(originalStart)
+    windowStart.setHours(0, 0, 0, 0)
+    const windowEnd = new Date(windowStart)
+    windowEnd.setDate(windowEnd.getDate() + 2)
+    windowEnd.setHours(23, 59, 59, 999)
+
+    // Normalize busy intervals into Date objects
+    const busyIntervals = busy.map(b => ({ start: new Date(b.start), end: new Date(b.end) }))
+
+    // Iterate every 30 minutes to find first 3 non-overlapping slots
+    const stepMs = 30 * 60 * 1000
+    for (let t = originalStart.getTime(); t + durationMs <= windowEnd.getTime(); t += stepMs) {
+      const candidateStart = new Date(t)
+      if (candidateStart < windowStart) continue
+      const candidateEnd = new Date(t + durationMs)
+      const overlaps = busyIntervals.some(b => intervalsOverlap(candidateStart, candidateEnd, b.start, b.end))
+      if (!overlaps) {
+        suggestions.push({ start: candidateStart.toISOString(), end: candidateEnd.toISOString() })
+      }
+      if (suggestions.length >= 3) break
+    }
+    return suggestions
+  }
+
+  const checkConflicts = async (plan: EventPlan) => {
+    setCheckingConflictsFor(plan.id)
+    setError(null)
+    try {
+      // Query a wider window (start-of-day to +2 days) so we can compute suggestions locally
+      const start = new Date(plan.startDateTime)
+      const dayStart = new Date(start)
+      dayStart.setHours(0,0,0,0)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setDate(dayEnd.getDate() + 2)
+      dayEnd.setHours(23,59,59,999)
+
+      const resp = await fetch('/api/calendar/conflicts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timeMin: dayStart.toISOString(),
+          timeMax: dayEnd.toISOString(),
+          items: [{ id: 'primary' }]
+        })
+      })
+      const data = await resp.json()
+      const busy = data?.calendars?.primary?.busy || []
+      setPlanConflicts(prev => ({ ...prev, [plan.id]: { busy } }))
+
+      // Compute suggestions that avoid busy intervals
+      const suggestions = computeSuggestions(plan, busy)
+      setPlanSuggestions(prev => ({ ...prev, [plan.id]: suggestions }))
+    } catch (e) {
+      setError('Failed to check conflicts')
+    } finally {
+      setCheckingConflictsFor(null)
+    }
+  }
+
+  const applySuggestion = (planId: string, suggestion: { start: string, end: string }) => {
+    setEditedPlans(prev => prev.map(plan => plan.id === planId ? ({ ...plan, startDateTime: suggestion.start, endDateTime: suggestion.end }) : plan))
+    setEditingPlan(planId)
+  }
+
   const formatTime = (dateTime: string) => {
     return new Date(dateTime).toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -134,7 +213,8 @@ export default function SchedulingInterface() {
           startDateTime: plan.startDateTime,
           endDateTime: plan.endDateTime,
           location: plan.location,
-          attendees: plan.attendees
+          attendees: plan.attendees,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
         })
       })
       if (!resp.ok) {
@@ -146,6 +226,22 @@ export default function SchedulingInterface() {
       const data = await resp.json()
       setError(null)
       setSuccessBanner(`Event created${data.data?.htmlLink ? `: ${data.data.htmlLink}` : ` (demo): ${data.data.id}`}`)
+
+      // Write audit log (fire-and-forget)
+      fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'calendar.create',
+          detail: {
+            planId: plan.id,
+            title: plan.title,
+            start: plan.startDateTime,
+            end: plan.endDateTime,
+            result: data?.data?.id || data?.data?.htmlLink || 'ok'
+          }
+        })
+      }).catch(() => {})
     } catch (e) {
       setSuccessBanner(null)
       setError('Failed to create event')
@@ -349,6 +445,14 @@ export default function SchedulingInterface() {
                       >
                         Add to Calendar
                       </button>
+                      <button
+                        onClick={() => checkConflicts(plan)}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-md text-sm font-medium transition-colors"
+                        disabled={checkingConflictsFor === plan.id}
+                        title="Check for conflicts"
+                      >
+                        {checkingConflictsFor === plan.id ? 'Checking…' : 'Check Conflicts'}
+                      </button>
                       <button 
                         onClick={() => isEditing ? saveEdit(plan.id) : startEditing(plan.id)}
                         className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-md text-sm font-medium transition-colors"
@@ -356,6 +460,30 @@ export default function SchedulingInterface() {
                         {isEditing ? 'Save Changes' : 'Modify'}
                       </button>
                     </div>
+
+                    {planConflicts[plan.id]?.busy?.length ? (
+                      <div className="mt-3 p-3 rounded bg-yellow-50 text-yellow-800 text-sm">
+                        <div className="font-medium mb-1">Conflicts detected:</div>
+                        <ul className="list-disc ml-5">
+                          {planConflicts[plan.id].busy.map((b, i) => (
+                            <li key={i}>{new Date(b.start).toLocaleString()} - {new Date(b.end).toLocaleString()}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {planSuggestions[plan.id]?.length ? (
+                      <div className="mt-3 p-3 rounded bg-green-50 text-green-800 text-sm">
+                        <div className="font-medium mb-1">Suggested alternatives:</div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          {planSuggestions[plan.id].map((s, i) => (
+                            <button key={i} onClick={() => applySuggestion(plan.id, s)} className="px-2 py-1 border border-green-300 rounded hover:bg-green-100 text-left">
+                              {new Date(s.start).toLocaleString()} → {new Date(s.end).toLocaleString()}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 )
               })}
@@ -379,6 +507,9 @@ export default function SchedulingInterface() {
           </div>
         </div>
       )}
+
+      {/* Audit Panel */}
+      <AuditPanel />
     </div>
   )
 }

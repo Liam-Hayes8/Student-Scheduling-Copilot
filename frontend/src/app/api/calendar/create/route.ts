@@ -18,24 +18,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(data, { status: resp.status })
     }
 
-    // Real mode: require signed-in session and pass bearer token to backend API
+    // Real mode: call Google Calendar directly with the user's access token
     const session = await getServerSession(authOptions)
     const accessToken = (session as any)?.accessToken as string | undefined
     if (!accessToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005'
-    const resp = await fetch(`${apiUrl}/api/calendar/create`, {
+    const { title, description, startDateTime, endDateTime, location, attendees, timeZone } = body || {}
+    if (!title || !startDateTime || !endDateTime) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    const googleResp = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${accessToken}`
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        summary: title,
+        description,
+        location,
+        attendees: Array.isArray(attendees) ? attendees.map((email: string) => ({ email })) : undefined,
+        start: { dateTime: startDateTime, timeZone: timeZone || 'UTC' },
+        end: { dateTime: endDateTime, timeZone: timeZone || 'UTC' }
+      })
     })
-    const data = await resp.json().catch(() => ({ error: 'Upstream error' }))
-    return NextResponse.json(data, { status: resp.status })
+
+    const googleData = await googleResp.json().catch(() => ({ error: 'Google API error' }))
+    if (!googleResp.ok) {
+      const message = (googleData && (googleData.error?.message || googleData.message || googleData.error_description)) || 'Google API error'
+      return NextResponse.json({ error: message, details: googleData }, { status: googleResp.status })
+    }
+    return NextResponse.json({ data: googleData }, { status: 200 })
   } catch (e) {
     return NextResponse.json({ error: 'Proxy error' }, { status: 500 })
   }

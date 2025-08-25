@@ -9,8 +9,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing naturalLanguageInput' }, { status: 400 })
     }
 
-    // Connect to our simple backend server
-    const apiUrl = 'http://localhost:3006'
+    // Choose backend based on demo mode
+    const demo = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false'
+    const apiUrl = demo ? 'http://localhost:3006' : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005')
     
     const response = await fetch(`${apiUrl}/api/planner/analyze`, {
       method: 'POST',

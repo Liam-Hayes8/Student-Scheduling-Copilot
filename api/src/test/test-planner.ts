@@ -1,5 +1,6 @@
 import { PlannerService } from '../modules/planner';
 import { LLMOrchestratorService } from '../modules/llm';
+import { __test_parseDateLoose } from '../modules/rag';
 
 async function testPlannerService() {
   console.log('🧪 Testing Planner Service...');
@@ -83,6 +84,15 @@ if (require.main === module) {
   (async () => {
     await testPlannerService();
     await testLLMService();
+    // Quick RAG date parser checks
+    console.log('\n🧪 Testing RAG date parser...')
+    const samples = [
+      'Oct 15', 'October 15, 2025', '15 Oct 2025', '10/15/2025', '10.15.2025', 'Oct 15th', '10/15'
+    ]
+    for (const s of samples) {
+      const iso = __test_parseDateLoose(s, 2025)
+      console.log(`  ${s} -> ${iso}`)
+    }
     console.log('\n🎉 Testing complete!');
   })();
 }

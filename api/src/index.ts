@@ -1,9 +1,9 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
 
 import { errorHandler, notFound } from '@/middleware/error';
 import { requestLogger } from '@/middleware/logging';
@@ -12,7 +12,6 @@ import plannerRoutes from '@/routes/planner';
 import calendarRoutes from '@/routes/calendar';
 import syllabusRoutes from '@/routes/syllabus';
 
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3005;

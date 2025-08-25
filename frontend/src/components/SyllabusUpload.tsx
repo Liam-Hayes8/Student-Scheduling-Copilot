@@ -34,6 +34,9 @@ export default function SyllabusUpload() {
   const [errorBanner, setErrorBanner] = useState<string | null>(null)
   const [successBanner, setSuccessBanner] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [snippets, setSnippets] = useState<{ content: string; pageNumber?: number; chunkIndex?: number }[]>([])
+  const [conflictMap, setConflictMap] = useState<Record<string, { start: string; end: string }[]>>({})
+  const [editTimes, setEditTimes] = useState<Record<string, { date: string; time: string; durationMins: number }>>({})
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -83,6 +86,10 @@ export default function SyllabusUpload() {
       const data = await response.json()
       setSearchResults(data.data.events)
       setSuccessBanner(`Found ${data.data.count} matching event(s)`) 
+
+      // Load top matching snippets (semantic when real API is enabled)
+      const snp = await fetch(`/api/syllabus/snippets?userId=demo-user&query=${encodeURIComponent(searchQuery)}&limit=5`).then(r=>r.json()).catch(()=>({ data: { snippets: [] }}))
+      setSnippets(snp?.data?.snippets || [])
     } catch (error) {
       setErrorBanner('Search failed. Please try again.')
     }
@@ -95,25 +102,157 @@ export default function SyllabusUpload() {
     setErrorBanner(null)
     setSuccessBanner(null)
     try {
-      const response = await fetch('/api/syllabus/import-events', {
+      // For each selected syllabus event, check conflicts via freeBusy, then create if free
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const toImport = (analysis?.events || []).filter(e => selectedEvents.has(e.id))
+
+      // Build time window spanning selected events
+      const startMin = new Date(Math.min(...toImport.map(e => new Date(e.date).getTime())))
+      const endMax = new Date(Math.max(...toImport.map(e => new Date(e.date).getTime())))
+      // Expand to cover a whole day range for safety
+      startMin.setHours(0,0,0,0)
+      endMax.setHours(23,59,59,999)
+
+      // Call conflicts endpoint (real mode requires auth)
+      const fbResp = await fetch('/api/calendar/conflicts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: 'demo-user',
-          eventIds: Array.from(selectedEvents)
+          timeMin: startMin.toISOString(),
+          timeMax: endMax.toISOString(),
+          items: [{ id: 'primary' }]
         })
       })
 
-      if (!response.ok) throw new Error('Import failed')
+      let busyBlocks: { start: string; end: string }[] = []
+      if (fbResp.ok) {
+        const fb = await fbResp.json()
+        const cal = fb?.calendars?.primary
+        busyBlocks = Array.isArray(cal?.busy) ? cal.busy : []
+      } else {
+        // In demo mode or if auth missing, proceed without blocking
+        busyBlocks = []
+      }
 
-      const data = await response.json()
-      setSuccessBanner(`Prepared ${data.data.imported} event(s) for calendar import (demo)`) 
+      // For each event, check overlap using edited times if provided
+      const conflicts: Record<string, { start: string; end: string }[]> = {}
+      const alternatives: Record<string, { start: string; end: string }[]> = {}
+      const nonConflicting: typeof toImport = []
+
+      for (const ev of toImport) {
+        const userEdit = editTimes[ev.id]
+        const base = userEdit ? new Date(`${userEdit.date}T${userEdit.time}:00`) : new Date(ev.date)
+        if (!userEdit) base.setHours(12, 0, 0, 0)
+        const duration = userEdit?.durationMins ?? 60
+        const start = base
+        const end = new Date(start.getTime() + duration * 60 * 1000)
+        const overlaps = busyBlocks.filter(b => {
+          const bs = new Date(b.start).getTime()
+          const be = new Date(b.end).getTime()
+          const es = start.getTime()
+          const ee = end.getTime()
+          return Math.max(bs, es) < Math.min(be, ee)
+        })
+        if (overlaps.length) {
+          conflicts[ev.id] = overlaps
+          // Suggest simple alternatives for the same day
+          const sugg = computeAlternativesForDay(start, busyBlocks, duration)
+          if (sugg.length) alternatives[ev.id] = sugg.slice(0, 3)
+        } else {
+          nonConflicting.push(ev)
+        }
+      }
+
+      setConflictMap(conflicts)
+      setAlternativesMap(alternatives)
+
+      // Create only non-conflicting events
+      let created = 0
+      for (const ev of nonConflicting) {
+        const userEdit = editTimes[ev.id]
+        const base = userEdit ? new Date(`${userEdit.date}T${userEdit.time}:00`) : new Date(ev.date)
+        if (!userEdit) base.setHours(12, 0, 0, 0)
+        const duration = userEdit?.durationMins ?? 60
+        const start = base
+        const end = new Date(start.getTime() + duration * 60 * 1000)
+
+        const resp = await fetch('/api/calendar/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: ev.title,
+            description: ev.description || `Imported from syllabus (${ev.type})`,
+            startDateTime: start.toISOString(),
+            endDateTime: end.toISOString(),
+            timeZone: tz
+          })
+        })
+        if (resp.ok) created += 1
+      }
+
+      const conflictCount = Object.keys(conflicts).length
+      const createdMsg = created > 0 ? `Created ${created} event(s)` : 'No events created'
+      const conflictMsg = conflictCount > 0 ? `, ${conflictCount} had conflicts` : ''
+      setSuccessBanner(`${createdMsg}${conflictMsg}`)
       setSelectedEvents(new Set())
+      setEditTimes({})
     } catch (error) {
       setErrorBanner('Import failed. Please try again.')
     } finally {
       setIsImporting(false)
     }
+  }
+
+  const onEditTimeChange = (eventId: string, field: 'date' | 'time' | 'durationMins', value: string) => {
+    setEditTimes(prev => {
+      const next = { ...prev }
+      const cur = next[eventId] || { date: new Date().toISOString().slice(0,10), time: '12:00', durationMins: 60 }
+      if (field === 'durationMins') {
+        cur.durationMins = Math.max(15, Math.min(480, parseInt(value || '60', 10) || 60))
+      } else if (field === 'date') {
+        cur.date = value
+      } else {
+        cur.time = value
+      }
+      next[eventId] = cur
+      return next
+    })
+  }
+
+  const computeAlternativesForDay = (preferredStart: Date, busy: { start: string; end: string }[], durationMins: number) => {
+    const day = new Date(preferredStart)
+    const candidates: { start: string; end: string }[] = []
+    const dayStart = new Date(day); dayStart.setHours(8,0,0,0)
+    const dayEnd = new Date(day); dayEnd.setHours(20,0,0,0)
+    const stepMs = 30 * 60 * 1000
+    const durMs = durationMins * 60 * 1000
+    for (let t = dayStart.getTime(); t + durMs <= dayEnd.getTime(); t += stepMs) {
+      const s = new Date(t)
+      const e = new Date(t + durMs)
+      const overlaps = busy.some(b => {
+        const bs = new Date(b.start).getTime()
+        const be = new Date(b.end).getTime()
+        return Math.max(bs, s.getTime()) < Math.min(be, e.getTime())
+      })
+      if (!overlaps) {
+        candidates.push({ start: s.toISOString(), end: e.toISOString() })
+        if (candidates.length >= 5) break
+      }
+    }
+    return candidates
+  }
+
+  const useAlternative = (eventId: string, startISO: string, endISO: string) => {
+    const start = new Date(startISO)
+    const end = new Date(endISO)
+    const y = start.getFullYear()
+    const m = String(start.getMonth()+1).padStart(2,'0')
+    const d = String(start.getDate()).padStart(2,'0')
+    const hh = String(start.getHours()).padStart(2,'0')
+    const mm = String(start.getMinutes()).padStart(2,'0')
+    const durationMins = Math.max(15, Math.round((end.getTime()-start.getTime())/60000))
+    setEditTimes(prev => ({ ...prev, [eventId]: { date: `${y}-${m}-${d}`, time: `${hh}:${mm}`, durationMins } }))
+    setConflictMap(prev => { const next = { ...prev }; delete next[eventId]; return next })
   }
 
   const toggleEventSelection = (eventId: string) => {
@@ -249,12 +388,65 @@ export default function SyllabusUpload() {
                       <CalendarIcon className="h-4 w-4 inline mr-1" />
                       {formatDate(event.date)}
                     </p>
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      <input
+                        type="date"
+                        value={editTimes[event.id]?.date || event.date.slice(0,10)}
+                        onChange={(e) => onEditTimeChange(event.id, 'date', e.target.value)}
+                        className="p-2 border border-gray-300 rounded text-gray-900"
+                      />
+                      <input
+                        type="time"
+                        value={editTimes[event.id]?.time || '12:00'}
+                        onChange={(e) => onEditTimeChange(event.id, 'time', e.target.value)}
+                        className="p-2 border border-gray-300 rounded text-gray-900"
+                      />
+                      <input
+                        type="number"
+                        min={15}
+                        max={480}
+                        step={15}
+                        value={editTimes[event.id]?.durationMins ?? 60}
+                        onChange={(e) => onEditTimeChange(event.id, 'durationMins', e.target.value)}
+                        className="p-2 border border-gray-300 rounded text-gray-900"
+                        placeholder="Duration (mins)"
+                      />
+                    </div>
                     {event.description && (
                       <p className="text-sm text-gray-600 mb-2">{event.description}</p>
                     )}
                     <p className="text-xs text-gray-500 italic">
                       Source: "{event.sourceText}"
                     </p>
+                    {conflictMap[event.id] && (
+                      <div className="mt-2 text-xs text-red-600">
+                        Conflicts detected at:
+                        <ul className="list-disc ml-5">
+                          {conflictMap[event.id].map((b, idx) => (
+                            <li key={idx}>{new Date(b.start).toLocaleTimeString()} - {new Date(b.end).toLocaleTimeString()}</li>
+                          ))}
+                        </ul>
+                        {alternativesMap[event.id]?.length ? (
+                          <div className="mt-2 text-gray-700">
+                            <div className="mb-1">Suggested alternatives:</div>
+                            <div className="flex flex-wrap gap-2">
+                              {alternativesMap[event.id].map((alt, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => useAlternative(event.id, alt.start, alt.end)}
+                                  className="px-2 py-1 text-xs rounded border border-blue-300 text-blue-700 hover:bg-blue-50"
+                                  title={`Use ${new Date(alt.start).toLocaleTimeString()} - ${new Date(alt.end).toLocaleTimeString()}`}
+                                >
+                                  {new Date(alt.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  {' - '}
+                                  {new Date(alt.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                   <input
                     type="checkbox"
@@ -334,6 +526,20 @@ export default function SyllabusUpload() {
                 </p>
               </div>
             ))}
+
+            {snippets.length > 0 && (
+              <div className="mt-4">
+                <h5 className="font-medium text-gray-900 mb-2">Top matching snippets</h5>
+                <div className="space-y-2">
+                  {snippets.map((s, i) => (
+                    <div key={i} className="p-2 border border-gray-200 rounded bg-gray-50 text-sm text-gray-800">
+                      <div className="mb-1 text-xs text-gray-500">Page {s.pageNumber ?? '-'} • Chunk {s.chunkIndex ?? '-'}</div>
+                      <div className="whitespace-pre-wrap">{s.content.slice(0, 400)}{s.content.length > 400 ? '…' : ''}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
