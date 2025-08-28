@@ -1,6 +1,7 @@
 export const dynamic = 'force-static'
 
-let AUDIT_LOG: Array<{ id: string; timestamp: string; action: string; detail?: any }> = []
+type AuditEntry = { id: string; timestamp: string; action: string; detail?: unknown }
+const AUDIT_LOG: AuditEntry[] = []
 
 export async function GET() {
   return new Response(JSON.stringify({ items: AUDIT_LOG.slice(-50).reverse() }), {

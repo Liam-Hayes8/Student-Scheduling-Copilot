@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     // Real mode: call Google Calendar directly with the user's access token
     const session = await getServerSession(authOptions)
-    const accessToken = (session as any)?.accessToken as string | undefined
+    const accessToken = (session as { accessToken?: string } | null)?.accessToken
     if (!accessToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

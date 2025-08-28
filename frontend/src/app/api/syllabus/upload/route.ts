@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
 
     // Accept multipart/form-data from the browser and forward metadata as JSON to demo API
     const contentType = request.headers.get('content-type') || ''
-    let payload: any = {}
+    let payload: Record<string, unknown> = {}
 
     if (contentType.includes('multipart/form-data')) {
       const form = await request.formData()
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       if (demo) {
         payload = {
           filename: file?.name || 'syllabus.pdf',
-          size: file ? (file as any).size : 0,
+          size: file ? (file as File).size : 0,
           userId: form.get('userId') || 'demo-user'
         }
         const resp = await fetch(`${apiUrl}/api/syllabus/upload`, {

@@ -6,7 +6,7 @@ interface AuditEntry {
   id: string
   timestamp: string
   action: string
-  detail?: any
+  detail?: unknown
 }
 
 export default function AuditPanel() {
@@ -20,7 +20,7 @@ export default function AuditPanel() {
       if (!res.ok) throw new Error('Failed to load audit log')
       const data = await res.json()
       setItems(data.items || [])
-    } catch (e) {
+    } catch {
       setError('Failed to load audit log')
     }
   }

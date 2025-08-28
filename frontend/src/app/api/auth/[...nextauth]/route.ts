@@ -30,7 +30,7 @@ const authOptions: NextAuthOptions = {
       }
 
       // Access token has expired, try to update it
-      return refreshAccessToken(token)
+      return refreshAccessToken(token as any)
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken
@@ -49,7 +49,14 @@ const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 }
 
-async function refreshAccessToken(token: any) {
+type JwtToken = {
+  accessToken?: string
+  refreshToken?: string
+  accessTokenExpires?: number
+  error?: string
+}
+
+async function refreshAccessToken(token: JwtToken) {
   try {
     const url = 'https://oauth2.googleapis.com/token'
     
@@ -78,8 +85,8 @@ async function refreshAccessToken(token: any) {
       accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
     }
-  } catch (error) {
-    console.error('Error refreshing access token:', error)
+  } catch {
+    // swallow and mark error
     return {
       ...token,
       error: 'RefreshAccessTokenError',

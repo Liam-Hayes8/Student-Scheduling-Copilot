@@ -22,7 +22,7 @@ export default function AuthRequired() {
         <div className="space-y-4">
           <div className="flex items-center space-x-3 text-sm text-gray-600">
             <SparklesIcon className="h-5 w-5 text-blue-500" />
-            <span>Parse natural language requests like Study 7-9pm Tu/Th</span>
+            <span>Parse natural language requests like Study 7–9pm Tu/Th</span>
           </div>
           <div className="flex items-center space-x-3 text-sm text-gray-600">
             <ClockIcon className="h-5 w-5 text-blue-500" />

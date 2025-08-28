@@ -73,7 +73,7 @@ export default function SchedulingInterface() {
     setEditingPlan(planId)
   }
 
-  const saveEdit = (planId: string) => {
+  const saveEdit = (_planId: string) => {
     setEditingPlan(null)
   }
 
@@ -159,7 +159,7 @@ export default function SchedulingInterface() {
       // Compute suggestions that avoid busy intervals
       const suggestions = computeSuggestions(plan, busy)
       setPlanSuggestions(prev => ({ ...prev, [plan.id]: suggestions }))
-    } catch (e) {
+    } catch {
       setError('Failed to check conflicts')
     } finally {
       setCheckingConflictsFor(null)
@@ -199,8 +199,7 @@ export default function SchedulingInterface() {
 
   const handleAddToCalendar = async (plan: EventPlan) => {
     try {
-      const demo = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false'
-      let headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       // Lazy import useSession hook data by reading from window if available is overkill; keep simple: rely on backend demo unless demo disabled.
       // In real mode, frontend route should attach bearer in its route handler. For now, demo path stays.
 
@@ -242,7 +241,7 @@ export default function SchedulingInterface() {
           }
         })
       }).catch(() => {})
-    } catch (e) {
+    } catch {
       setSuccessBanner(null)
       setError('Failed to create event')
     }
@@ -499,11 +498,11 @@ export default function SchedulingInterface() {
             How to use the Scheduling Copilot
           </h3>
           <div className="space-y-2 text-sm text-blue-800">
-            <p>• <strong>Time blocks:</strong> "Study 7-9pm Tuesday/Thursday"</p>
-            <p>• <strong>Recurring events:</strong> "Gym sessions 3x per week, mornings preferred"</p>
-            <p>• <strong>Constraints:</strong> "Avoid Fridays, no events before 8am"</p>
-            <p>• <strong>Conflicts:</strong> "Work around my existing lab schedule"</p>
-            <p>• <strong>Duration:</strong> "2-hour study blocks for calculus"</p>
+            <p>• <strong>Time blocks:</strong> Study 7–9pm Tuesday/Thursday</p>
+            <p>• <strong>Recurring events:</strong> Gym sessions 3x per week, mornings preferred</p>
+            <p>• <strong>Constraints:</strong> Avoid Fridays, no events before 8am</p>
+            <p>• <strong>Conflicts:</strong> Work around my existing lab schedule</p>
+            <p>• <strong>Duration:</strong> 2‑hour study blocks for calculus</p>
           </div>
         </div>
       )}
