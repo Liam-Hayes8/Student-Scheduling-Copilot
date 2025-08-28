@@ -327,7 +327,7 @@ export default function SchedulingInterface() {
 
             <div className="mb-4 p-3 bg-gray-50 rounded-lg">
               <div className="text-sm text-gray-600">Original Request:</div>
-              <div className="text-gray-900 font-medium">"{response.data.originalInput}"</div>
+              <div className="text-gray-900 font-medium">{response.data.originalInput}</div>
             </div>
 
             <div className="space-y-4">

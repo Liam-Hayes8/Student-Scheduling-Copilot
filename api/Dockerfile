@@ -6,8 +6,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (handle peer deps in CI image)
+RUN npm config set legacy-peer-deps true \
+  && npm install --no-audit --no-fund
 
 # Copy source code
 COPY . .

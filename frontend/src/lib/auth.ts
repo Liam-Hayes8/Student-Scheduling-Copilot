@@ -2,7 +2,14 @@ import { getServerSession } from 'next-auth/next'
 import type { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 
-async function refreshAccessToken(token: any) {
+type JwtToken = {
+  accessToken?: string
+  refreshToken?: string
+  accessTokenExpires?: number
+  error?: string
+}
+
+async function refreshAccessToken(token: JwtToken): Promise<JwtToken> {
   try {
     const response = await fetch('https://oauth2.googleapis.com/token', {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -25,7 +32,7 @@ async function refreshAccessToken(token: any) {
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
       error: undefined,
     }
-  } catch (error) {
+  } catch {
     return { ...token, error: 'RefreshAccessTokenError' }
   }
 }

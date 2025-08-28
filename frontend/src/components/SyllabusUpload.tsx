@@ -67,7 +67,7 @@ export default function SyllabusUpload() {
       const data = await response.json()
       setAnalysis(data.data)
       setSuccessBanner(data.data?.summary || 'Syllabus processed')
-    } catch (error) {
+    } catch {
       setErrorBanner('Failed to upload syllabus. Please try again.')
     } finally {
       setIsUploading(false)
@@ -90,7 +90,7 @@ export default function SyllabusUpload() {
       // Load top matching snippets (semantic when real API is enabled)
       const snp = await fetch(`/api/syllabus/snippets?userId=demo-user&query=${encodeURIComponent(searchQuery)}&limit=5`).then(r=>r.json()).catch(()=>({ data: { snippets: [] }}))
       setSnippets(snp?.data?.snippets || [])
-    } catch (error) {
+    } catch {
       setErrorBanner('Search failed. Please try again.')
     }
   }
@@ -196,7 +196,7 @@ export default function SyllabusUpload() {
       setSuccessBanner(`${createdMsg}${conflictMsg}`)
       setSelectedEvents(new Set())
       setEditTimes({})
-    } catch (error) {
+    } catch {
       setErrorBanner('Import failed. Please try again.')
     } finally {
       setIsImporting(false)
@@ -242,7 +242,7 @@ export default function SyllabusUpload() {
     return candidates
   }
 
-  const useAlternative = (eventId: string, startISO: string, endISO: string) => {
+  const applyAlternative = (eventId: string, startISO: string, endISO: string) => {
     const start = new Date(startISO)
     const end = new Date(endISO)
     const y = start.getFullYear()
@@ -416,7 +416,7 @@ export default function SyllabusUpload() {
                       <p className="text-sm text-gray-600 mb-2">{event.description}</p>
                     )}
                     <p className="text-xs text-gray-500 italic">
-                      Source: "{event.sourceText}"
+                      Source: {event.sourceText}
                     </p>
                     {conflictMap[event.id] && (
                       <div className="mt-2 text-xs text-red-600">
@@ -433,7 +433,7 @@ export default function SyllabusUpload() {
                               {alternativesMap[event.id].map((alt, i) => (
                                 <button
                                   key={i}
-                                  onClick={() => useAlternative(event.id, alt.start, alt.end)}
+                                  onClick={() => applyAlternative(event.id, alt.start, alt.end)}
                                   className="px-2 py-1 text-xs rounded border border-blue-300 text-blue-700 hover:bg-blue-50"
                                   title={`Use ${new Date(alt.start).toLocaleTimeString()} - ${new Date(alt.end).toLocaleTimeString()}`}
                                 >
