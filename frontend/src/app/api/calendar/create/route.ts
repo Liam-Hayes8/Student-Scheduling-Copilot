@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: message, details: googleData }, { status: googleResp.status })
     }
     return NextResponse.json({ data: googleData }, { status: 200 })
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Proxy error' }, { status: 500 })
   }
 }

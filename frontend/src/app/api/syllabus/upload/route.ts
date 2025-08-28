@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(data, { status: resp.status })
     }
     
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Proxy error' }, { status: 500 })
   }
 }

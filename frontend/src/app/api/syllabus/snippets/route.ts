@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const resp = await fetch(`${apiUrl}/api/syllabus/snippets?userId=${encodeURIComponent(userId)}&query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`)
     const data = await resp.json().catch(() => ({ success: false, error: 'Bad upstream response' }))
     return NextResponse.json(data, { status: resp.status })
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Proxy error' }, { status: 500 })
   }
 }

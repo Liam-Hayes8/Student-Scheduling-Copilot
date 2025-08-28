@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     })
     const data = await resp.json()
     return NextResponse.json(data, { status: resp.status })
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Proxy error' }, { status: 500 })
   }
 }

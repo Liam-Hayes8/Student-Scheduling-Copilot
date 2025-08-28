@@ -30,7 +30,7 @@ const authOptions: NextAuthOptions = {
       }
 
       // Access token has expired, try to update it
-      return refreshAccessToken(token as any)
+      return refreshAccessToken(token as JwtToken)
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken

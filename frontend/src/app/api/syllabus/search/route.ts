@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const resp = await fetch(`${apiUrl}/api/syllabus/search?userId=${encodeURIComponent(userId)}&query=${encodeURIComponent(query)}`)
     const data = await resp.json()
     return NextResponse.json(data, { status: resp.status })
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Proxy error' }, { status: 500 })
   }
 }
