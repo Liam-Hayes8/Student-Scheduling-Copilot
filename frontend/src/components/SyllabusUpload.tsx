@@ -36,6 +36,7 @@ export default function SyllabusUpload() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [snippets, setSnippets] = useState<{ content: string; pageNumber?: number; chunkIndex?: number }[]>([])
   const [conflictMap, setConflictMap] = useState<Record<string, { start: string; end: string }[]>>({})
+  const [alternativesMap, setAlternativesMap] = useState<Record<string, { start: string; end: string }[]>>({})
   const [editTimes, setEditTimes] = useState<Record<string, { date: string; time: string; durationMins: number }>>({})
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
