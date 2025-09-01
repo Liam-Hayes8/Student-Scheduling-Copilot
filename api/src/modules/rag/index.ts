@@ -33,10 +33,15 @@ export class RAGService {
   constructor() {
     // Only initialize embeddings if API key is available
     if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'demo-key-placeholder') {
-      this.embeddings = new OpenAIEmbeddings({
-        openAIApiKey: process.env.OPENAI_API_KEY,
-        model: 'text-embedding-3-small' // 1536-dim to match vector(1536)
-      } as any);
+      try {
+        this.embeddings = new OpenAIEmbeddings({
+          openAIApiKey: process.env.OPENAI_API_KEY,
+          model: 'text-embedding-3-small' // 1536-dim to match vector(1536)
+        } as any)
+      } catch (e) {
+        console.warn('OpenAI embeddings initialization failed. Continuing without embeddings.', e)
+        this.embeddings = undefined
+      }
     }
     this.db = new DatabaseService();
   }
@@ -65,10 +70,15 @@ export class RAGService {
       // Create vector store if embeddings available (for local extraction heuristics)
       let vectorStore: MemoryVectorStore | undefined
       if (this.embeddings) {
-        vectorStore = await MemoryVectorStore.fromDocuments(
-          splitDocs,
-          this.embeddings
-        );
+        try {
+          vectorStore = await MemoryVectorStore.fromDocuments(
+            splitDocs,
+            this.embeddings
+          );
+        } catch (e) {
+          console.warn('Embeddings unavailable during vector store build. Continuing without vector search.', e);
+          vectorStore = undefined
+        }
       }
 
       // Extract course information
@@ -333,17 +343,28 @@ export class RAGService {
       })
 
       if (this.embeddings) {
-        const texts = docs.map(d => d.pageContent)
-        const vectors = await this.embeddings.embedDocuments(texts)
-        const chunks = docs.map((doc, index) => ({
-          syllabusId: (syllabus as any).id,
-          content: doc.pageContent,
-          chunkIndex: index,
-          pageNumber: doc.metadata?.pageNumber || 1,
-          embedding: vectors[index],
-          metadata: doc.metadata
-        }))
-        await (this.db as any).createSyllabusChunks(chunks)
+        try {
+          const texts = docs.map(d => d.pageContent)
+          const vectors = await this.embeddings.embedDocuments(texts)
+          const chunks = docs.map((doc, index) => ({
+            syllabusId: (syllabus as any).id,
+            content: doc.pageContent,
+            chunkIndex: index,
+            pageNumber: doc.metadata?.pageNumber || 1,
+            embedding: vectors[index],
+            metadata: doc.metadata
+          }))
+          await (this.db as any).createSyllabusChunks(chunks)
+        } catch (e) {
+          console.warn('Embeddings unavailable during chunk storage. Falling back to no-embedding storage.', e)
+          await (this.db as any).createSyllabusChunks(docs.map((doc: any, index: number) => ({
+            syllabusId: (syllabus as any).id,
+            content: doc.pageContent,
+            chunkIndex: index,
+            pageNumber: doc.metadata?.pageNumber || 1,
+            metadata: doc.metadata
+          })))
+        }
       } else {
         // Fallback to storing chunks without embeddings
         await (this.db as any).createSyllabusChunks(docs.map((doc: any, index: number) => ({

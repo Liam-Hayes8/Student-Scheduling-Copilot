@@ -254,7 +254,7 @@ export default function SchedulingInterface() {
         <div className="flex items-center space-x-2 mb-4">
           <SparklesIcon className="h-5 w-5 text-blue-500" />
           <h2 className="text-lg font-semibold text-gray-900">
-            Schedule with Natural Language
+            Schedule to your Google Calendar
           </h2>
         </div>
         
@@ -396,7 +396,7 @@ export default function SchedulingInterface() {
                             className="font-medium bg-white border border-gray-300 rounded px-2 py-1"
                           />
                         ) : (
-                          <span className="font-medium cursor-pointer hover:text-blue-600" onClick={() => startEditing(plan.id)}>
+                          <span className="font-semibold text-gray-900 cursor-pointer hover:text-blue-600" onClick={() => startEditing(plan.id)}>
                             {formatDate(plan.startDateTime)}
                           </span>
                         )}

@@ -23,12 +23,17 @@ export class LLMOrchestratorService {
 
   constructor() {
     // Only initialize OpenAI if API key is available and valid
-    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'demo-key-placeholder') {
-      this.openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-    } else {
-      console.warn('OpenAI API key not configured. LLM features will be disabled.');
+    try {
+      if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'demo-key-placeholder') {
+        this.openai = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+        });
+      } else {
+        console.warn('OpenAI API key not configured. LLM features will be disabled.');
+      }
+    } catch (e) {
+      console.warn('OpenAI initialization failed. Disabling LLM features.', e)
+      // leave this.openai undefined to trigger fallback
     }
   }
 
