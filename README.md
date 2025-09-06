@@ -127,3 +127,69 @@ The Student Scheduling Copilot solves this by combining natural language process
 ## License
 
 MIT License - see LICENSE file for details.
+
+## Up-to-date Quick Reference (2025-09)
+
+### Current project structure
+```
+/frontend/src/app            # Next.js App Router (API routes in here)
+/frontend/src/lib            # NextAuth config and helpers
+/api/src                     # Express API (prod), Cloud Run port 8080
+/simple-server.js            # Demo API (dev), port 3006
+/docker-compose.yml          # Local dev with Postgres + Redis + API + Frontend
+```
+
+### Dev ports
+- Frontend dev: http://localhost:3004 (via `frontend` scripts)
+- Demo API: http://localhost:3006 (used when NEXT_PUBLIC_DEMO_MODE is not "false")
+- Express API (prod build): 8080 (Cloud Run); 3001 when running locally via docker-compose
+
+### Modes
+- Demo mode (default): Uses the demo API for planner/syllabus/calendar so you can run without Google credentials. Controlled by `NEXT_PUBLIC_DEMO_MODE`.
+- Real mode: Set `NEXT_PUBLIC_DEMO_MODE=false` to call Google Calendar and your real backend.
+
+### Frontend env (.env.local)
+```
+NEXT_PUBLIC_DEMO_MODE=true           # omit or set to true for demo; set to false for real
+NEXTAUTH_URL=http://localhost:3004   # your deployed URL on Vercel in prod
+NEXTAUTH_SECRET=your-long-random-secret
+GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxxxxxxx
+NEXT_PUBLIC_API_URL=https://your-api.example.com   # only used in real mode for non-Google endpoints
+```
+
+### Backend env (.env)
+```
+NODE_ENV=production
+PORT=8080
+DATABASE_URL=postgresql://...
+REDIS_URL=redis://...
+OPENAI_API_KEY=sk-...
+FRONTEND_URL=https://your-frontend-domain
+GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxxxxxxx
+```
+
+### Google OAuth: who can sign in?
+- To allow anyone with a Google account to sign in:
+  1) In Google Cloud Console → OAuth consent screen, set User Type to External.
+  2) Set App status to In production.
+  3) Add authorized redirect URI: `http(s)://YOUR_DOMAIN/api/auth/callback/google` (and `http://localhost:3004/api/auth/callback/google` for local dev).
+  4) Enable the Google Calendar API for the same project.
+- If App status is In testing, only users you add as Test users can sign in.
+
+### Fix "Request had invalid authentication credentials" when creating events
+1) Ensure you are in real mode: `NEXT_PUBLIC_DEMO_MODE=false` (otherwise calendar writes are mocked).
+2) Confirm the OAuth project has Calendar API enabled and the redirect URI matches your site URL.
+3) Make sure the scope includes `https://www.googleapis.com/auth/calendar.events` (already configured).
+4) Revoke old access to force re-consent with the correct scope: https://myaccount.google.com/permissions → remove the app → sign in again.
+5) Set `NEXTAUTH_URL` to your exact site origin (including https in prod) and set a strong `NEXTAUTH_SECRET`.
+6) In Vercel, define the same env vars for the Production environment and redeploy.
+
+### Local development
+- Demo: `npm run dev` (frontend on 3004, demo API on 3006). You can exercise all flows without Google credentials.
+- Real: Create `frontend/.env.local` with real values and start only the frontend (`npm run dev:frontend`). For backend, run the Express API separately or deploy it (Railway/Cloud Run) and set `NEXT_PUBLIC_API_URL`.
+
+### Deploy
+- Frontend: Vercel (root = `frontend`). Set env vars from "Frontend env".
+- Backend: Railway (simple) or Cloud Run (see DEPLOYMENT_PRODUCTION.md).
