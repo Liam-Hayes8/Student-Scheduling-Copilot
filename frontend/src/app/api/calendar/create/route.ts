@@ -48,8 +48,11 @@ export async function POST(request: NextRequest) {
 
     const googleData = await googleResp.json().catch(() => ({ error: 'Google API error' }))
     if (!googleResp.ok) {
-      const message = (googleData && (googleData.error?.message || googleData.message || googleData.error_description)) || 'Google API error'
-      return NextResponse.json({ error: message, details: googleData }, { status: googleResp.status })
+      const rawMessage = (googleData && (googleData.error?.message || googleData.message || googleData.error_description)) || 'Google API error'
+      const hint = /invalid_grant|invalid_credentials|unauthorized/i.test(JSON.stringify(googleData))
+        ? 'Your Google session may be expired or missing the calendar.events scope. Please sign out, revoke access at https://myaccount.google.com/permissions, then sign in again.'
+        : undefined
+      return NextResponse.json({ error: rawMessage, hint, details: googleData }, { status: googleResp.status })
     }
     return NextResponse.json({ data: googleData }, { status: 200 })
   } catch {

@@ -311,13 +311,61 @@ export class RAGService {
   }
 
   private removeDuplicateEvents(events: SyllabusEvent[]): SyllabusEvent[] {
-    const seen = new Set<string>();
-    return events.filter(event => {
-      const key = `${event.title}_${event.date}_${event.type}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    // Stronger deduplication across lightly different titles pointing to same date
+    const stopwords = new Set(['the','a','an','of','for','to','and','on','in','with','at','by','from','is','are','due','exam','midterm','final','assignment','homework','hw','quiz','project','test','milestone','lab','lecture','class']);
+
+    const normalizeTitle = (title: string): string[] => {
+      return (title || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean)
+        .filter(t => !stopwords.has(t))
+        .slice(0, 8); // cap tokens to avoid noise
+    };
+
+    const jaccard = (a: string[], b: string[]): number => {
+      const A = new Set(a);
+      const B = new Set(b);
+      const inter = new Set([...A].filter(x => B.has(x)));
+      const union = new Set([...A, ...B]);
+      return union.size === 0 ? 0 : inter.size / union.size;
+    };
+
+    type BucketKey = string; // date(YYYY-MM-DD) + type
+    const buckets = new Map<BucketKey, SyllabusEvent[]>();
+
+    for (const e of events) {
+      const day = new Date(e.date).toISOString().slice(0, 10);
+      const key = `${day}__${e.type}`;
+      const arr = buckets.get(key) || [];
+      arr.push(e);
+      buckets.set(key, arr);
+    }
+
+    const result: SyllabusEvent[] = [];
+    for (const [, arr] of buckets) {
+      const kept: SyllabusEvent[] = [];
+      for (const e of arr.sort((a, b) => (b.confidence || 0) - (a.confidence || 0))) {
+        const eTokens = normalizeTitle(e.title || '');
+        const duplicate = kept.some(k => {
+          const sim = jaccard(eTokens, normalizeTitle(k.title || ''));
+          // Consider duplicate if titles are quite similar or identical after normalization
+          return sim >= 0.6 || (e.title || '').trim().toLowerCase() === (k.title || '').trim().toLowerCase();
+        });
+        if (!duplicate) kept.push(e);
+      }
+      // If nothing meaningful in title tokens, still guard exact date duplicates
+      const seenExact = new Set<string>();
+      for (const e of kept) {
+        const exactKey = `${new Date(e.date).toISOString()}__${(e.title || '').trim().toLowerCase()}__${e.type}`;
+        if (seenExact.has(exactKey)) continue;
+        seenExact.add(exactKey);
+        result.push(e);
+      }
+    }
+
+    return result;
   }
 
   private async storeSyllabusData(userId: string, courseInfo: any, events: SyllabusEvent[], docs: Document[], filename?: string) {
